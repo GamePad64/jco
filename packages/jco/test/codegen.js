@@ -262,3 +262,55 @@ suite("--strict", () => {
         );
     });
 });
+
+// Regression test for the bug fixed in
+// https://github.com/bytecodealliance/jco/pull/1464 — the per-table
+// assignment lines (`STREAM_TABLES[N] = …`, `FUTURE_TABLES[N] = …`,
+// `ERR_CTX_TABLES[N] = …`) were being emitted without their `const X = {};`
+// declarations, leaving the generated module with undeclared identifiers.
+suite("p3 global table-map declarations", () => {
+    test("emits const STREAM_TABLES declaration when component uses streams", async () => {
+        const bytes = await readFile(join(LOCAL_TEST_COMPONENTS_DIR, "stream-lower.wasm"));
+        const { files } = await transpile(bytes, { name: "stream-lower" });
+        const source = new TextDecoder().decode(files["stream-lower.js"]);
+
+        assert.isOk(
+            /STREAM_TABLES\[\d+\]\s*=/.test(source),
+            "expected at least one STREAM_TABLES[N] = … assignment for a stream-using component",
+        );
+        assert.isOk(
+            /const\s+STREAM_TABLES\s*=/.test(source),
+            "expected `const STREAM_TABLES = …;` declaration to precede the assignments",
+        );
+    });
+
+    test("emits const FUTURE_TABLES declaration when component uses futures", async () => {
+        const bytes = await readFile(join(LOCAL_TEST_COMPONENTS_DIR, "future-lower.wasm"));
+        const { files } = await transpile(bytes, { name: "future-lower" });
+        const source = new TextDecoder().decode(files["future-lower.js"]);
+
+        assert.isOk(
+            /FUTURE_TABLES\[\d+\]\s*=/.test(source),
+            "expected at least one FUTURE_TABLES[N] = … assignment for a future-using component",
+        );
+        assert.isOk(
+            /const\s+FUTURE_TABLES\s*=/.test(source),
+            "expected `const FUTURE_TABLES = …;` declaration to precede the assignments",
+        );
+    });
+
+    test("emits const ERR_CTX_TABLES declaration when component uses error-context", async () => {
+        const bytes = await readFile(join(LOCAL_TEST_COMPONENTS_DIR, "async-error-context.wasm"));
+        const { files } = await transpile(bytes, { name: "async-error-context" });
+        const source = new TextDecoder().decode(files["async-error-context.js"]);
+
+        assert.isOk(
+            /ERR_CTX_TABLES\[\d+\]\s*=/.test(source),
+            "expected at least one ERR_CTX_TABLES[N] = … assignment for an error-context-using component",
+        );
+        assert.isOk(
+            /const\s+ERR_CTX_TABLES\s*=/.test(source),
+            "expected `const ERR_CTX_TABLES = …;` declaration to precede the assignments",
+        );
+    });
+});
